@@ -9,17 +9,24 @@ use dotenvy::dotenv;
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 10)]
 async fn main() {
-    // load environment variables from .env file
-    dotenv().expect(".env file not found");
+    let envfile_exists = tokio::fs::try_exists(".env").await.unwrap();
 
-    let port = env::var("PORT")
-        .ok()
-        .and_then(|p| p.parse::<u16>().ok())
-        .unwrap_or(3000);
+    let mut port: u16 = 3000;
+    let mut download_dir: String = String::from("public");
 
-    let download_dir = env::var("FILES_DIR")
-        .ok()
-        .unwrap_or_else(|| String::from("public"));
+    if envfile_exists {
+        // load environment variables from .env file
+        dotenv().expect(".env file not found");
+
+        port = env::var("PORT")
+            .ok()
+            .and_then(|p| p.parse::<u16>().ok())
+            .unwrap_or(3000);
+
+        download_dir = env::var("FILES_DIR")
+            .ok()
+            .unwrap_or_else(|| String::from("public"));
+    }
 
     // Create dir if not exist
     if let Err(e) = tokio::fs::create_dir_all(&download_dir).await {
