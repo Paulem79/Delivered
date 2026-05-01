@@ -42,6 +42,7 @@ jobs:
           name: Release ${{ github.sha }}
           tag_name: release-${{ github.sha }}
           generate_release_notes: true
+          token: ${{ secrets.GITHUB_TOKEN }}
           files: |
             ${{ steps.compile.outputs.BUILT_ARCHIVE }}
             ${{ steps.compile.outputs.BUILT_CHECKSUM }}
