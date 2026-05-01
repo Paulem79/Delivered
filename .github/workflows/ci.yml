@@ -30,48 +30,54 @@ jobs:
       - name: Checkout
         uses: actions/checkout@master
 
-      - name: Compile and release
-        if: matrix.os == 'ubuntu-latest' && matrix.target != 'aarch64-unknown-linux-musl'
-        id: compile
-        uses: rust-build/rust-build.action@v1.4.5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          RUSTTARGET: ${{ matrix.target }}
-          ARCHIVE_TYPES: ${{ matrix.archive }}
-          TOOLCHAIN_VERSION: stable
-
-      - name: Compile and release (aarch64 Linux)
-        if: matrix.target == 'aarch64-unknown-linux-musl'
-        id: aarch64-linux-compile
+      - name: Compile and release (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        id: ubuntu-compile
         run: |
           curl -sL https://github.com/cross-rs/cross/releases/latest/download/cross-x86_64-unknown-linux-musl.tar.gz | tar xz
           sudo mv cross /usr/local/bin/
           cross build --release --target ${{ matrix.target }}
           
-          tar -czf delivered-rust-${{ matrix.target }}.tar.gz -C target/${{ matrix.target }}/release delivered-rust
-          tar -cJf delivered-rust-${{ matrix.target }}.tar.xz -C target/${{ matrix.target }}/release delivered-rust
-          tar --zstd -cf delivered-rust-${{ matrix.target }}.tar.zst -C target/${{ matrix.target }}/release delivered-rust
-          
-          shasum -a 256 delivered-rust-${{ matrix.target }}.tar.gz > delivered-rust-${{ matrix.target }}.tar.gz.sha256
-          shasum -a 256 delivered-rust-${{ matrix.target }}.tar.xz > delivered-rust-${{ matrix.target }}.tar.xz.sha256
-          shasum -a 256 delivered-rust-${{ matrix.target }}.tar.zst > delivered-rust-${{ matrix.target }}.tar.zst.sha256
-          
-          {
-            echo "BUILT_ARCHIVE<<EOF"
-            echo "delivered-rust-${{ matrix.target }}.tar.gz"
-            echo "delivered-rust-${{ matrix.target }}.tar.xz"
-            echo "delivered-rust-${{ matrix.target }}.tar.zst"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-          
-          {
-            echo "BUILT_CHECKSUM<<EOF"
-            echo "delivered-rust-${{ matrix.target }}.tar.gz.sha256"
-            echo "delivered-rust-${{ matrix.target }}.tar.xz.sha256"
-            echo "delivered-rust-${{ matrix.target }}.tar.zst.sha256"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+          if [[ "${{ matrix.target }}" == *"windows"* ]]; then
+            zip -j delivered-rust-${{ matrix.target }}.zip target/${{ matrix.target }}/release/delivered-rust.exe
+            shasum -a 256 delivered-rust-${{ matrix.target }}.zip > delivered-rust-${{ matrix.target }}.zip.sha256
+            
+            {
+              echo "BUILT_ARCHIVE<<EOF"
+              echo "delivered-rust-${{ matrix.target }}.zip"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            
+            {
+              echo "BUILT_CHECKSUM<<EOF"
+              echo "delivered-rust-${{ matrix.target }}.zip.sha256"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          else
+            tar -czf delivered-rust-${{ matrix.target }}.tar.gz -C target/${{ matrix.target }}/release delivered-rust
+            tar -cJf delivered-rust-${{ matrix.target }}.tar.xz -C target/${{ matrix.target }}/release delivered-rust
+            tar --zstd -cf delivered-rust-${{ matrix.target }}.tar.zst -C target/${{ matrix.target }}/release delivered-rust
+            
+            shasum -a 256 delivered-rust-${{ matrix.target }}.tar.gz > delivered-rust-${{ matrix.target }}.tar.gz.sha256
+            shasum -a 256 delivered-rust-${{ matrix.target }}.tar.xz > delivered-rust-${{ matrix.target }}.tar.xz.sha256
+            shasum -a 256 delivered-rust-${{ matrix.target }}.tar.zst > delivered-rust-${{ matrix.target }}.tar.zst.sha256
+            
+            {
+              echo "BUILT_ARCHIVE<<EOF"
+              echo "delivered-rust-${{ matrix.target }}.tar.gz"
+              echo "delivered-rust-${{ matrix.target }}.tar.xz"
+              echo "delivered-rust-${{ matrix.target }}.tar.zst"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            
+            {
+              echo "BUILT_CHECKSUM<<EOF"
+              echo "delivered-rust-${{ matrix.target }}.tar.gz.sha256"
+              echo "delivered-rust-${{ matrix.target }}.tar.xz.sha256"
+              echo "delivered-rust-${{ matrix.target }}.tar.zst.sha256"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Install Rust target
         if: matrix.os == 'macos-latest'
@@ -92,8 +98,8 @@ jobs:
         with:
           name: Binary-${{ matrix.target }}
           path: |
-            ${{ steps.compile.outputs.BUILT_ARCHIVE || steps.macos-compile.outputs.BUILT_ARCHIVE || steps.aarch64-linux-compile.outputs.BUILT_ARCHIVE }}
-            ${{ steps.compile.outputs.BUILT_CHECKSUM || steps.macos-compile.outputs.BUILT_CHECKSUM || steps.aarch64-linux-compile.outputs.BUILT_CHECKSUM }}
+            ${{ steps.ubuntu-compile.outputs.BUILT_ARCHIVE || steps.macos-compile.outputs.BUILT_ARCHIVE }}
+            ${{ steps.ubuntu-compile.outputs.BUILT_CHECKSUM || steps.macos-compile.outputs.BUILT_CHECKSUM }}
 
   publish:
     name: Publish Release
