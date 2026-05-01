@@ -36,6 +36,12 @@ jobs:
         run: |
           curl -sL https://github.com/cross-rs/cross/releases/latest/download/cross-x86_64-unknown-linux-musl.tar.gz | tar xz
           sudo mv cross /usr/local/bin/
+          
+          if [[ "${{ matrix.target }}" == *"windows"* ]]; then
+            # Windows compilation needs ws2_32 for networking
+            export RUSTFLAGS="-C link-arg=-lws2_32 -C link-arg=-lbcrypt -C link-arg=-luserenv -C link-arg=-lntdll"
+          fi
+          
           cross build --release --target ${{ matrix.target }}
           
           if [[ "${{ matrix.target }}" == *"windows"* ]]; then
