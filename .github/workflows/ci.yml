@@ -95,6 +95,20 @@ jobs:
             ${{ steps.compile.outputs.BUILT_ARCHIVE || steps.macos-compile.outputs.BUILT_ARCHIVE || steps.aarch64-linux-compile.outputs.BUILT_ARCHIVE }}
             ${{ steps.compile.outputs.BUILT_CHECKSUM || steps.macos-compile.outputs.BUILT_CHECKSUM || steps.aarch64-linux-compile.outputs.BUILT_CHECKSUM }}
 
+  publish:
+    name: Publish Release
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: Binary-*
+          merge-multiple: true
+          path: release-artifacts
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -102,8 +116,4 @@ jobs:
           tag_name: release-${{ github.sha }}
           generate_release_notes: true
           token: ${{ secrets.GITHUB_TOKEN }}
-          files: |
-            ${{ steps.compile.outputs.BUILT_ARCHIVE || steps.macos-compile.outputs.BUILT_ARCHIVE || steps.aarch64-linux-compile.outputs.BUILT_ARCHIVE }}
-            ${{ steps.compile.outputs.BUILT_CHECKSUM || steps.macos-compile.outputs.BUILT_CHECKSUM || steps.aarch64-linux-compile.outputs.BUILT_CHECKSUM }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          files: release-artifacts/*
