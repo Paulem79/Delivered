@@ -1,12 +1,17 @@
 on:
-  push
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
 
 jobs:
   release:
     name: release ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
+    # Only the publish job writes to the repository.
     permissions:
-      contents: write
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -28,7 +33,7 @@ jobs:
             os: macos-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@master
+        uses: actions/checkout@v5
 
       - name: Install Rust target
         if: matrix.os != 'ubuntu-latest'
@@ -38,7 +43,14 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         id: ubuntu-compile
         run: |
-          curl -sL https://github.com/cross-rs/cross/releases/latest/download/cross-x86_64-unknown-linux-musl.tar.gz | tar xz
+          # Pinned version + checksum: this binary builds the published releases.
+          CROSS_VERSION=v0.2.5
+          CROSS_SHA256=a486cefa6cb486971b97be321ea9dfc2e90c1979550295314a368f53fab6d588
+          curl -sSfL -o cross.tar.gz \
+            "https://github.com/cross-rs/cross/releases/download/${CROSS_VERSION}/cross-x86_64-unknown-linux-musl.tar.gz"
+          echo "${CROSS_SHA256}  cross.tar.gz" | sha256sum --check --strict
+          tar xzf cross.tar.gz cross
+          rm cross.tar.gz
           sudo mv cross /usr/local/bin/
           
           cross build --release --target ${{ matrix.target }}
@@ -99,6 +111,8 @@ jobs:
   publish:
     name: Publish Release
     needs: release
+    # Publish only for version tags, never for every branch push.
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -113,8 +127,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: Release ${{ github.sha }}
-          tag_name: release-${{ github.sha }}
+          name: Release ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
           generate_release_notes: true
           token: ${{ secrets.GITHUB_TOKEN }}
           files: release-artifacts/*
