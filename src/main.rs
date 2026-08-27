@@ -17,9 +17,20 @@ use percent_encoding::percent_decode_str;
 use tower_http::compression::CompressionLayer;
 use tower_http::services::ServeDir;
 
+mod api;
+mod fmp4;
+mod hls;
+mod mp4;
+
+use api::StreamApi;
+
 const DEFAULT_PORT: u16 = 3000;
 const DEFAULT_BIND_ADDR: &str = "0.0.0.0";
 const DEFAULT_FILES_DIR: &str = "public";
+/// Sub-directory of `FILES_DIR` whose `.mp4` files are exposed as HLS.
+const DEFAULT_STREAM_DIR: &str = "stream";
+/// Nominal segment length, in seconds. Real segments land on the next keyframe.
+const DEFAULT_TARGET_DURATION: f64 = 6.0;
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -69,9 +80,27 @@ async fn main() -> ExitCode {
         }
     };
 
+    let stream_dir = env::var("STREAM_DIR").unwrap_or_else(|_| String::from(DEFAULT_STREAM_DIR));
+    let target_duration = match env::var("HLS_TARGET_DURATION") {
+        Ok(v) => match v.parse::<f64>() {
+            Ok(d) if d.is_finite() && d > 0.0 => d,
+            _ => {
+                eprintln!("Invalid HLS_TARGET_DURATION value `{v}`: expected a positive number");
+                return ExitCode::FAILURE;
+            }
+        },
+        Err(_) => DEFAULT_TARGET_DURATION,
+    };
+
+    // Chunking and playlists are served from the same tree as the raw files, so
+    // a client can fall back to a plain download of the source .mp4.
+    let stream_api = Arc::new(StreamApi::new(base_dir.join(&stream_dir), target_duration));
+
     let app = Router::new()
         // Base route
         .route("/", get(|| async { "Hello World!" }))
+        // HLS packaging API
+        .merge(stream_api.router())
         // Serve the static files
         .fallback_service(ServeDir::new(base_dir.as_path()))
         .layer(from_fn_with_state(base_dir.clone(), reject_escaping_paths))
@@ -88,6 +117,7 @@ async fn main() -> ExitCode {
     };
 
     println!("Listening on {addr}, serving {}", base_dir.display());
+    println!("HLS API on /api/stream, packaging {}", base_dir.join(&stream_dir).display());
     if let Err(e) = axum::serve(listener, app).await {
         eprintln!("Server error: {e}");
         return ExitCode::FAILURE;
