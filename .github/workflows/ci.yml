@@ -101,7 +101,7 @@ jobs:
           echo "BUILT_CHECKSUM=delivered-rust-${{ matrix.target }}.zip.sha256" >> $GITHUB_OUTPUT
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: Binary-${{ matrix.target }}
           path: |
@@ -118,7 +118,7 @@ jobs:
       contents: write
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: Binary-*
           merge-multiple: true
