@@ -8,7 +8,7 @@ axum = "0.8.9"
 dotenvy = "0.15.7"
 percent-encoding = "2.3.2"
 tokio = { version = "1.52.1", features = ["rt-multi-thread", "macros", "fs", "net"] }
-tower-http = { version = "0.6.8", features = ["fs", "compression-gzip", "compression-br"] }
+tower-http = { version = "0.7.0", features = ["fs", "compression-gzip", "compression-br"] }
 
 [profile.release]
 lto = "fat"
